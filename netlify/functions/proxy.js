@@ -1,20 +1,16 @@
 /**
- * Netlify Function Proxy for FirstMail API (with extensive logging for debugging).
+ * Netlify Function Proxy for FirstMail API (using native fetch).
+ * This function handles CORS and forwards the request to the external API.
  */
-const fetch = require('node-fetch');
-
+// Define the actual target API endpoint
 const TARGET_API_URL = "https://api.firstmail.ltd/v1/mail/change/password";
 
+// Netlify's standard handler format
 exports.handler = async (event) => {
-  // --- EXTENSIVE LOGGING FOR DEBUGGING ---
-  console.log("--- NEW FUNCTION INVOCATION ---");
-  console.log("Received Event Object:", JSON.stringify(event, null, 2));
-  // --- END LOGGING ---
-
   // 1. Handle CORS Pre-flight (OPTIONS)
   if (event.httpMethod === "OPTIONS") {
     return {
-      statusCode: 204,
+      statusCode: 204, // No Content
       headers: {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "POST, OPTIONS",
@@ -31,11 +27,8 @@ exports.handler = async (event) => {
 
   // 2. Handle the actual POST request
   try {
-    // Check for the request body
     if (!event.body) {
-      const errorMessage = `Request body is missing. Method: ${event.httpMethod}. Headers: ${JSON.stringify(event.headers)}.`;
-      console.error("CRITICAL ERROR:", errorMessage);
-      throw new Error(errorMessage);
+      throw new Error("Request body is missing.");
     }
 
     const requestJson = JSON.parse(event.body);
