@@ -1,32 +1,29 @@
 /**
- * Netlify Function Proxy for FirstMail API.
- * This function handles CORS and forwards the request to the external API.
- * * To use:
- * 1. Create a folder named 'netlify' in your repo root.
- * 2. Inside 'netlify', create a folder named 'functions'.
- * 3. Place this file inside 'netlify/functions/'.
- * 4. The public URL will be: YOUR_DOMAIN/.netlify/functions/proxy
+ * Netlify Function Proxy for FirstMail API (with extensive logging for debugging).
  */
+const fetch = require('node-fetch');
 
-// Define the actual target API endpoint
 const TARGET_API_URL = "https://api.firstmail.ltd/v1/mail/change/password";
 
-// Netlify's standard handler format
 exports.handler = async (event) => {
-  // 1. Handle CORS Pre-flight (OPTIONS) request sent by the browser
+  // --- EXTENSIVE LOGGING FOR DEBUGGING ---
+  console.log("--- NEW FUNCTION INVOCATION ---");
+  console.log("Received Event Object:", JSON.stringify(event, null, 2));
+  // --- END LOGGING ---
+
+  // 1. Handle CORS Pre-flight (OPTIONS)
   if (event.httpMethod === "OPTIONS") {
     return {
-      statusCode: 204, // No Content
+      statusCode: 204,
       headers: {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "POST, OPTIONS",
         "Access-Control-Allow-Headers": "Content-Type",
-        "Access-Control-Max-Age": "86400", // Cache pre-flight response for 24 hours
+        "Access-Control-Max-Age": "86400",
       },
     };
   }
   
-  // Set the default CORS header for all actual responses
   const corsHeaders = {
       "Access-Control-Allow-Origin": "*",
       "Content-Type": "application/json",
@@ -34,26 +31,24 @@ exports.handler = async (event) => {
 
   // 2. Handle the actual POST request
   try {
-    // Ensure the request body is present
+    // Check for the request body
     if (!event.body) {
-        throw new Error("Request body is missing.");
+      const errorMessage = `Request body is missing. Method: ${event.httpMethod}. Headers: ${JSON.stringify(event.headers)}.`;
+      console.error("CRITICAL ERROR:", errorMessage);
+      throw new Error(errorMessage);
     }
 
     const requestJson = JSON.parse(event.body);
-
-    // Extract data sent from the web app
     const { username: mail, cpassword: cpass, npassword: npass, api_key } = requestJson;
 
-    // Validate required fields
     if (!mail || !cpass || !npass || !api_key) {
       return {
         statusCode: 400,
         headers: corsHeaders,
-        body: JSON.stringify({ error: "Missing required fields (username, cpassword, npassword, api_key)" }),
+        body: JSON.stringify({ error: "Missing required fields" }),
       };
     }
 
-    // 3. Prepare payload and headers for the actual external API call
     const apiPayload = {
       username: mail,
       cpassword: cpass,
@@ -61,10 +56,9 @@ exports.handler = async (event) => {
     };
     const apiHeaders = {
       "Content-Type": "application/json",
-      "X-API-KEY": api_key, // Use the key passed from the client
+      "X-API-KEY": api_key,
     };
 
-    // 4. Make the external API call (server-to-server) using fetch
     const response = await fetch(TARGET_API_URL, {
       method: "POST",
       headers: apiHeaders,
@@ -73,7 +67,6 @@ exports.handler = async (event) => {
 
     const resultJson = await response.json();
     
-    // 5. Return the result from the external API to the client
     return {
       statusCode: response.status,
       headers: corsHeaders,
@@ -81,7 +74,6 @@ exports.handler = async (event) => {
     };
 
   } catch (e) {
-    // Handle any other internal errors (like JSON parsing issues or network errors)
     console.error("Internal proxy error:", e);
     return {
       statusCode: 500,
